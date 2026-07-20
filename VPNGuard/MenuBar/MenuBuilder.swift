@@ -14,6 +14,7 @@ final class MenuBuilder {
     let vpnItem = NSMenuItem()
     let protectionItem = NSMenuItem()
     let blockedItem = NSMenuItem()
+    let toggleProtectionItem = NSMenuItem()
 
     private weak var target: AnyObject?
 
@@ -25,8 +26,11 @@ final class MenuBuilder {
         let menu = NSMenu()
 
         vpnItem.title = "VPN: Checking..."
+        vpnItem.isEnabled = false
         protectionItem.title = "Protection: ..."
+        protectionItem.isEnabled = false
         blockedItem.title = "Blocked: 0"
+        blockedItem.isEnabled = false
 
         menu.addItem(vpnItem)
         menu.addItem(protectionItem)
@@ -34,17 +38,8 @@ final class MenuBuilder {
 
         menu.addItem(NSMenuItem.separator())
 
-        menu.addItem(makeItem(
-            title: "Enable Protection",
-            action: #selector(MenuActions.enableProtection),
-            keyEquivalent: ""
-        ))
-
-        menu.addItem(makeItem(
-            title: "Disable Protection",
-            action: #selector(MenuActions.disableProtection),
-            keyEquivalent: ""
-        ))
+        toggleProtectionItem.target = target
+        menu.addItem(toggleProtectionItem)
 
         menu.addItem(makeItem(
             title: "Refresh IPs",
@@ -95,10 +90,16 @@ final class MenuBuilder {
 
         if !protectionEnabled {
             protectionItem.title = "Protection: Disabled"
-        } else if isBlocking {
-            protectionItem.title = "Protection: BLOCKING"
+            toggleProtectionItem.title = "Enable Protection"
+            toggleProtectionItem.action = #selector(MenuActions.enableProtection)
         } else {
-            protectionItem.title = "Protection: Enabled"
+            if isBlocking {
+                protectionItem.title = "Protection: BLOCKING"
+            } else {
+                protectionItem.title = "Protection: Enabled"
+            }
+            toggleProtectionItem.title = "Disable Protection"
+            toggleProtectionItem.action = #selector(MenuActions.disableProtection)
         }
 
         blockedItem.title = "Blocked: \(blockedCount) (\(protectedIPCount) IPs)"
