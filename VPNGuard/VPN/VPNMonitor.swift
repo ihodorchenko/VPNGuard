@@ -44,8 +44,6 @@ final class VPNMonitor {
         isChecking = true
         defer { isChecking = false }
 
-        engine.handleVPNChecking()
-
         let hosts = Rules.shared.protectedHosts
         guard !hosts.isEmpty else {
             await engine.handleVPNDisconnected()

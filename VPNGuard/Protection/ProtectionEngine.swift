@@ -33,35 +33,33 @@ final class ProtectionEngine: ObservableObject {
 
     /// Called by VPNMonitor when VPN routes are verified.
     func handleVPNConnected() async {
-        guard state != .connected else { return }
+        let wasConnected = (state == .connected)
+        let shouldClearBlocks = isBlocking || state == .disconnected
 
-        let previousState = state
-        state = .connected
+        if !wasConnected {
+            state = .connected
+            Logger.shared.info("VPN Connected")
+        }
 
-        Logger.shared.info("VPN Connected")
-
-        if protectionEnabled && previousState == .disconnected {
+        // Always clear PF rules when VPN is up and we still have blocks loaded.
+        // (Previously skipped when an intermediate .checking state masked .disconnected.)
+        if protectionEnabled && shouldClearBlocks {
             await disableBlocking()
         }
     }
 
     /// Called by VPNMonitor when VPN routes are lost.
     func handleVPNDisconnected() async {
-        guard state != .disconnected else { return }
+        let wasDisconnected = (state == .disconnected)
 
-        state = .disconnected
-
-        Logger.shared.security("VPN unavailable — activating kill switch")
-
-        if protectionEnabled {
-            await enableBlocking()
+        if !wasDisconnected {
+            state = .disconnected
+            Logger.shared.security("VPN unavailable — activating kill switch")
         }
-    }
 
-    /// Called during initial check.
-    func handleVPNChecking() {
-        if state != .checking {
-            state = .checking
+        // Apply (or re-apply) blocks whenever protection is on and VPN is down.
+        if protectionEnabled && (!isBlocking || !wasDisconnected) {
+            await enableBlocking()
         }
     }
 
@@ -94,19 +92,20 @@ final class ProtectionEngine: ObservableObject {
         isTransitioning = true
         defer { isTransitioning = false }
 
-        let ips = Rules.shared.protectedIPs
-        if ips.isEmpty {
+        if Rules.shared.protectedIPs.isEmpty {
             _ = await Rules.shared.refresh()
         }
 
         await pfManager.enableBlock(ips: Rules.shared.protectedIPs)
         isBlocking = pfManager.blockingActive
 
-        for host in Rules.shared.protectedHosts {
-            ConnectionRegistry.shared.recordBlocked(
-                host: host,
-                reason: "VPN unavailable"
-            )
+        if isBlocking {
+            for host in Rules.shared.protectedHosts {
+                ConnectionRegistry.shared.recordBlocked(
+                    host: host,
+                    reason: "VPN unavailable"
+                )
+            }
         }
     }
 
@@ -117,6 +116,10 @@ final class ProtectionEngine: ObservableObject {
 
         await pfManager.disableBlock()
         isBlocking = pfManager.blockingActive
-        ConnectionRegistry.shared.resetBlockedCount()
+
+        if !isBlocking {
+            ConnectionRegistry.shared.resetBlockedCount()
+            Logger.shared.info("Kill switch cleared — traffic allowed")
+        }
     }
 }

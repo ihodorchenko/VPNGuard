@@ -71,11 +71,11 @@ final class PFExecutor {
     }
 
     func flushAnchor() throws {
-        let empty = PFRuleBuilder.shared.buildEmptyRules()
-        try writeConfig(content: empty)
-        if anchorHasRules() {
-            try runPFCTL(["-a", anchorName, "-f", configPath])
-        }
+        // Hard-flush all rules in the anchor, then load an empty file.
+        _ = try? runPFCTL(["-a", anchorName, "-F", "all"])
+        try writeConfig(content: PFRuleBuilder.shared.buildEmptyRules())
+        try runPFCTL(["-a", anchorName, "-f", configPath])
+        logInfo("PF anchor \(anchorName) flushed")
     }
 
     /// Enables PF using reference-counted -E (required on modern macOS).
