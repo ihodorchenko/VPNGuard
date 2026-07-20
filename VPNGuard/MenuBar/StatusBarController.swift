@@ -81,6 +81,13 @@ final class StatusBarController: NSObject, MenuActions {
     private func updateIcon() {
         guard let button = statusItem.button else { return }
 
+        // Protection off → orange (kill switch idle, hosts are reachable)
+        guard engine.protectionEnabled else {
+            button.title = "🟠 VG"
+            return
+        }
+
+        // Protection on → color reflects VPN / block status
         switch engine.state {
         case .checking:
             button.title = "🟡 VG"
