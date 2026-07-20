@@ -56,11 +56,11 @@ final class VPNMonitor {
             let viaVPN = RouteChecker.shared.isVPNRoute(for: host)
             if !viaVPN {
                 allViaVPN = false
-                Logger.shared.debug("Route not via VPN", details: ["Host": host])
                 break
             }
         }
 
+        // Engine is edge-triggered: repeated same-status calls are no-ops.
         if allViaVPN {
             await engine.handleVPNConnected()
         } else {

@@ -3,6 +3,7 @@
 //  VPNGuard
 //
 //  Central engine coordinating VPN state and PF kill switch activation.
+//  PF rules are applied only on real state edges — steady polls are no-ops.
 //
 
 import Foundation
@@ -29,36 +30,52 @@ final class ProtectionEngine: ObservableObject {
         state == .connected
     }
 
-    // MARK: - State Transitions
+    // MARK: - State Transitions (edge-triggered)
 
-    /// Called by VPNMonitor when VPN routes are verified.
+    /// VPN routes confirmed. Clears PF blocks only when needed.
     func handleVPNConnected() async {
-        let wasConnected = (state == .connected)
-        let shouldClearBlocks = isBlocking || state == .disconnected
-
-        if !wasConnected {
-            state = .connected
-            Logger.shared.info("VPN Connected")
+        // Steady state: already connected and not blocking → nothing to do.
+        if state == .connected && !isBlocking {
+            return
         }
 
-        // Always clear PF rules when VPN is up and we still have blocks loaded.
-        // (Previously skipped when an intermediate .checking state masked .disconnected.)
-        if protectionEnabled && shouldClearBlocks {
+        // Recovery: connected but blocks still active (e.g. previous flush failed).
+        if state == .connected && isBlocking {
+            if protectionEnabled {
+                await disableBlocking()
+            }
+            return
+        }
+
+        // Edge: checking/disconnected → connected
+        state = .connected
+        Logger.shared.info("VPN Connected")
+
+        if protectionEnabled {
             await disableBlocking()
         }
     }
 
-    /// Called by VPNMonitor when VPN routes are lost.
+    /// VPN routes lost. Enables PF blocks only when needed.
     func handleVPNDisconnected() async {
-        let wasDisconnected = (state == .disconnected)
-
-        if !wasDisconnected {
-            state = .disconnected
-            Logger.shared.security("VPN unavailable — activating kill switch")
+        // Steady state: already disconnected and blocking → nothing to do.
+        if state == .disconnected && isBlocking {
+            return
         }
 
-        // Apply (or re-apply) blocks whenever protection is on and VPN is down.
-        if protectionEnabled && (!isBlocking || !wasDisconnected) {
+        // Recovery: disconnected but blocks somehow cleared.
+        if state == .disconnected && !isBlocking {
+            if protectionEnabled {
+                await enableBlocking()
+            }
+            return
+        }
+
+        // Edge: checking/connected → disconnected
+        state = .disconnected
+        Logger.shared.security("VPN unavailable — activating kill switch")
+
+        if protectionEnabled {
             await enableBlocking()
         }
     }
@@ -66,12 +83,17 @@ final class ProtectionEngine: ObservableObject {
     // MARK: - Manual Controls
 
     func setProtectionEnabled(_ enabled: Bool) async {
+        guard enabled != protectionEnabled else { return }
+
         protectionEnabled = enabled
         UserDefaults.standard.set(enabled, forKey: Constants.DefaultsKey.protectionEnabled)
 
-        if enabled && state == .disconnected {
-            await enableBlocking()
-        } else if !enabled {
+        if enabled {
+            if state == .disconnected {
+                await enableBlocking()
+            }
+            // If VPN is connected, leave traffic open — nothing to apply.
+        } else {
             await disableBlocking()
         }
 
@@ -80,15 +102,18 @@ final class ProtectionEngine: ObservableObject {
 
     func refreshIPsAndRules() async {
         let ips = await Rules.shared.refresh()
-        if isBlocking {
-            await pfManager.refreshRules(ips: ips)
-        }
+        // Only push new IPs to PF while actively blocking.
+        guard isBlocking else { return }
+        await pfManager.refreshRules(ips: ips)
     }
 
-    // MARK: - Blocking
+    // MARK: - Blocking (guards against redundant XPC/pfctl)
 
     private func enableBlocking() async {
         guard !isTransitioning else { return }
+        // Already blocking according to both local and helper state — skip.
+        if isBlocking && pfManager.blockingActive { return }
+
         isTransitioning = true
         defer { isTransitioning = false }
 
@@ -111,6 +136,9 @@ final class ProtectionEngine: ObservableObject {
 
     private func disableBlocking() async {
         guard !isTransitioning else { return }
+        // Already clear — skip XPC round-trip.
+        if !isBlocking && !pfManager.blockingActive { return }
+
         isTransitioning = true
         defer { isTransitioning = false }
 
