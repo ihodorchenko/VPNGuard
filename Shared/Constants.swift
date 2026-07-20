@@ -55,6 +55,17 @@ enum Constants {
     /// Interval between DNS refresh cycles (seconds).
     static let dnsRefreshInterval: TimeInterval = 300.0
 
+    // MARK: - Logging Limits
+
+    /// Max size of a single daily log file before it is truncated.
+    static let maxLogFileBytes: UInt64 = 2 * 1024 * 1024 // 2 MB
+
+    /// How many days of log files to keep.
+    static let maxLogRetentionDays: Int = 7
+
+    /// Soft cap on total size of the log directory.
+    static let maxLogDirectoryBytes: UInt64 = 10 * 1024 * 1024 // 10 MB
+
     /// XPC connection Mach service name for the privileged helper.
     static let helperMachServiceName = "by.home.VPNGuard.helper"
 }
