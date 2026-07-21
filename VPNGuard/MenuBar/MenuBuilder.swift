@@ -56,6 +56,12 @@ final class MenuBuilder {
         ))
 
         menu.addItem(makeItem(
+            title: "Help…",
+            action: #selector(MenuActions.openHelp),
+            keyEquivalent: "?"
+        ))
+
+        menu.addItem(makeItem(
             title: "Open Logs",
             action: #selector(MenuActions.openLogs),
             keyEquivalent: "l"
@@ -129,6 +135,7 @@ protocol MenuActions {
     func disableProtection()
     func refreshIPs()
     func openSettings()
+    func openHelp()
     func openLogs()
     func quit()
 }

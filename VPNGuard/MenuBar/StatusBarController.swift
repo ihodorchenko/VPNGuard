@@ -117,6 +117,10 @@ final class StatusBarController: NSObject, MenuActions {
         NSApp.activate(ignoringOtherApps: true)
     }
 
+    @objc func openHelp() {
+        HelpWindowController.shared.show(engine: engine)
+    }
+
     @objc func openLogs() {
         Logger.shared.revealLogsInFinder()
     }
