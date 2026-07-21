@@ -8,6 +8,7 @@
 build/
 DerivedData/
 .derivedData/
+*.app
 *.ipa
 *.dSYM.zip
 *.dSYM
