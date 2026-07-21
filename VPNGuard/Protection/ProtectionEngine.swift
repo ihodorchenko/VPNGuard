@@ -107,6 +107,15 @@ final class ProtectionEngine: ObservableObject {
         await pfManager.refreshRules(ips: ips)
     }
 
+    /// Clears PF block rules when the application is quitting.
+    func cleanupOnShutdown() async {
+        isTransitioning = false
+        await pfManager.disableBlock()
+        isBlocking = pfManager.blockingActive
+        ConnectionRegistry.shared.resetBlockedCount()
+        Logger.shared.info("Shutdown cleanup — PF rules cleared")
+    }
+
     // MARK: - Blocking (guards against redundant XPC/pfctl)
 
     private func enableBlocking() async {

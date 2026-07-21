@@ -33,7 +33,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         vpnMonitor.stop()
         Rules.shared.stopPeriodicRefresh()
+        clearBlockingRulesOnExit()
         Logger.shared.info("VPNGuard terminated")
+    }
+
+    /// Waits briefly for PF cleanup so block rules do not outlive the app.
+    private func clearBlockingRulesOnExit() {
+        let runCleanup = { [self] in
+            var completed = false
+            Task { @MainActor in
+                await protectionEngine.cleanupOnShutdown()
+                PFManager.shared.shutdown()
+                completed = true
+            }
+
+            let deadline = Date().addingTimeInterval(5)
+            while !completed && Date() < deadline {
+                RunLoop.current.run(
+                    mode: .default,
+                    before: Date().addingTimeInterval(0.05)
+                )
+            }
+
+            if !completed {
+                Logger.shared.error(
+                    "Shutdown cleanup timed out — PF rules may still be active",
+                    details: ["Hint": "Use Help → manual removal commands"]
+                )
+            }
+        }
+
+        if Thread.isMainThread {
+            runCleanup()
+        } else {
+            DispatchQueue.main.sync(execute: runCleanup)
+        }
     }
 
     // MARK: - Bootstrap

@@ -204,6 +204,14 @@ final class PFManager: NSObject, ObservableObject {
         }
     }
 
+    /// Stops reconnect attempts and closes the helper XPC connection.
+    func shutdown() {
+        reconnectTask?.cancel()
+        reconnectTask = nil
+        connection?.invalidate()
+        connection = nil
+    }
+
     // MARK: - Private
 
     private func sendCommand(
