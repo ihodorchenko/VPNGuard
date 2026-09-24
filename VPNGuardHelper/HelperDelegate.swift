@@ -9,23 +9,16 @@ import Foundation
 
 final class HelperDelegate: NSObject, NSXPCListenerDelegate {
 
-    private var activeTools = [ObjectIdentifier: HelperTool]()
+    /// Single tool shared across connections so PF state (enable reference,
+    /// loaded rules, blocking flag) stays process-wide and consistent.
+    private let tool = HelperTool()
 
     func listener(
         _ listener: NSXPCListener,
         shouldAcceptNewConnection newConnection: NSXPCConnection
     ) -> Bool {
-        let tool = HelperTool()
-        activeTools[ObjectIdentifier(newConnection)] = tool
-
         newConnection.exportedInterface = NSXPCInterface(with: VPNGuardHelperProtocol.self)
         newConnection.exportedObject = tool
-
-        newConnection.invalidationHandler = { [weak self, weak newConnection] in
-            guard let self, let newConnection else { return }
-            self.activeTools.removeValue(forKey: ObjectIdentifier(newConnection))
-        }
-
         newConnection.resume()
         return true
     }

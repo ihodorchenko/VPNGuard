@@ -108,7 +108,7 @@ final class MenuBuilder {
             toggleProtectionItem.action = #selector(MenuActions.disableProtection)
         }
 
-        blockedItem.title = "Blocked: \(blockedCount) (\(protectedIPCount) IPs)"
+        blockedItem.title = "Blocked: \(blockedCount) host(s) (\(protectedIPCount) IPs)"
     }
 
     // MARK: - Private

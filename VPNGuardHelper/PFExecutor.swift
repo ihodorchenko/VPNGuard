@@ -32,6 +32,7 @@ final class PFExecutor {
     private let anchorName = Constants.pfAnchorName
     private let log = OSLog(subsystem: Constants.helperBundleID, category: "PFExecutor")
     private var pfEnabledByUs = false
+    private var pfToken: String?
 
     // MARK: - Bootstrap
 
@@ -84,7 +85,42 @@ final class PFExecutor {
         // -E returns 0 on success; may return non-zero if already enabled by us
         let output = try runPFCTL(["-E"])
         pfEnabledByUs = true
+        pfToken = Self.parseReferenceToken(from: output)
         logInfo("PF enabled: \(output.trimmingCharacters(in: .whitespacesAndNewlines))")
+    }
+
+    /// Releases the PF enable reference taken by `enablePF`, restoring the
+    /// system's prior PF state. Best-effort: failures are logged, not thrown.
+    func releasePF() {
+        guard pfEnabledByUs else { return }
+        defer {
+            pfEnabledByUs = false
+            pfToken = nil
+        }
+
+        guard let token = pfToken else {
+            logInfo("PF release skipped — no reference token was captured")
+            return
+        }
+
+        do {
+            _ = try runPFCTL(["-X", token])
+            logInfo("PF enable reference released (token \(token))")
+        } catch {
+            logError("Failed to release PF reference: \(error.localizedDescription)")
+        }
+    }
+
+    /// Extracts the reference token from `pfctl -E` output ("token : 12345").
+    private static func parseReferenceToken(from output: String) -> String? {
+        for line in output.components(separatedBy: .newlines) {
+            guard let range = line.range(of: "token") else { continue }
+            let value = line[range.upperBound...]
+                .drop(while: { $0 == " " || $0 == ":" || $0 == "\t" })
+                .trimmingCharacters(in: .whitespaces)
+            if !value.isEmpty { return value }
+        }
+        return nil
     }
 
     /// Kills existing TCP/UDP states to blocked IPs, tearing down active connections.

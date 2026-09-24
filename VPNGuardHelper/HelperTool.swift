@@ -103,6 +103,9 @@ final class HelperTool: NSObject, VPNGuardHelperProtocol {
     private func disableBlocking() -> HelperResponse {
         do {
             try pfExecutor.flushAnchor()
+            // Give back the PF enable reference so the system returns to its
+            // prior PF state once we stop blocking.
+            pfExecutor.releasePF()
             blockingActive = false
 
             return HelperResponse(
