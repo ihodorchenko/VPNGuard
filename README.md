@@ -105,6 +105,20 @@ VPN unavailable
 
 ## Testing
 
+### Unit tests
+
+The pure logic in `Shared/` (PF rule building, VPN interface matching, XPC
+command contract) is covered by a standalone SwiftPM test target:
+
+```bash
+swift test
+```
+
+These tests compile only the dependency-free `Shared/` sources and run without
+launching the app, so no admin prompt or helper installation is triggered.
+
+### Manual checks
+
 ### 1. VPN connected → hosts reachable
 
 Connect VPN, launch VPNGuard. Menu shows **🟢 VG**. Verify:

@@ -34,32 +34,14 @@ final class RouteChecker: Sendable {
 
     /// Reads VPN interface settings from UserDefaults.
     private var allowedInterfacePrefixes: [String] {
-        var prefixes = [String]()
-
-        let custom = UserDefaults.standard.string(
-            forKey: Constants.DefaultsKey.customVPNInterface
-        )?.trimmingCharacters(in: .whitespaces)
-
-        if let custom, !custom.isEmpty {
-            prefixes.append(custom)
-        }
-
-        let configuredPrefix = (UserDefaults.standard.string(
-            forKey: Constants.DefaultsKey.vpnInterfacePrefix
-        ) ?? Constants.defaultVPNInterfacePrefix)
-            .trimmingCharacters(in: .whitespaces)
-
-        // An empty prefix would make `hasPrefix("")` match every interface,
-        // silently disabling protection — fall back to the default instead.
-        let defaultPrefix = configuredPrefix.isEmpty
-            ? Constants.defaultVPNInterfacePrefix
-            : configuredPrefix
-
-        if !prefixes.contains(defaultPrefix) {
-            prefixes.append(defaultPrefix)
-        }
-
-        return prefixes
+        VPNInterfaceMatcher.interfacePrefixes(
+            configured: UserDefaults.standard.string(
+                forKey: Constants.DefaultsKey.vpnInterfacePrefix
+            ),
+            custom: UserDefaults.standard.string(
+                forKey: Constants.DefaultsKey.customVPNInterface
+            )
+        )
     }
 
     // MARK: - Private
@@ -89,24 +71,9 @@ final class RouteChecker: Sendable {
     }
 
     private func parseInterface(from text: String) -> Bool {
-        let prefixes = allowedInterfacePrefixes
-
-        for line in text.components(separatedBy: .newlines) {
-            guard line.contains("interface:") else { continue }
-
-            let iface = line
-                .components(separatedBy: ":")
-                .dropFirst()
-                .joined(separator: ":")
-                .trimmingCharacters(in: .whitespaces)
-
-            for prefix in prefixes {
-                if iface.hasPrefix(prefix) || iface == prefix {
-                    return true
-                }
-            }
-        }
-
-        return false
+        VPNInterfaceMatcher.routeUsesVPNInterface(
+            in: text,
+            prefixes: allowedInterfacePrefixes
+        )
     }
 }
