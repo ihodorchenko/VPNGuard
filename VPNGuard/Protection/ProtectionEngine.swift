@@ -62,49 +62,40 @@ final class ProtectionEngine: ObservableObject {
 
     /// VPN routes confirmed. Clears PF blocks only when needed.
     func handleVPNConnected() async {
-        // Steady state: already connected and not blocking → nothing to do.
-        if state == .connected && !isBlocking {
-            return
-        }
-
-        // Recovery: connected but blocks still active (e.g. previous flush failed).
-        if state == .connected && isBlocking {
-            if protectionEnabled {
-                await disableBlocking()
-            }
-            return
-        }
-
-        // Edge: checking/disconnected → connected
-        state = .connected
-        Logger.shared.info("VPN Connected")
-
-        if protectionEnabled {
-            await disableBlocking()
-        }
+        await applyVPNState(connected: true)
     }
 
     /// VPN routes lost. Enables PF blocks only when needed.
     func handleVPNDisconnected() async {
-        // Steady state: already disconnected and blocking → nothing to do.
-        if state == .disconnected && isBlocking {
-            return
-        }
+        await applyVPNState(connected: false)
+    }
 
-        // Recovery: disconnected but blocks somehow cleared.
-        if state == .disconnected && !isBlocking {
-            if protectionEnabled {
-                await enableBlocking()
+    /// Evaluates the pure protection policy: updates the published state on a
+    /// real edge and performs at most one blocking transition. Repeated polls
+    /// with an unchanged state are no-ops.
+    private func applyVPNState(connected: Bool) async {
+        let decision = ProtectionPolicy.decide(
+            vpnConnected: connected,
+            isBlocking: isBlocking,
+            protectionEnabled: protectionEnabled
+        )
+
+        if decision.state != state {
+            state = decision.state
+            if connected {
+                Logger.shared.info("VPN Connected")
+            } else {
+                Logger.shared.security("VPN unavailable — activating kill switch")
             }
-            return
         }
 
-        // Edge: checking/connected → disconnected
-        state = .disconnected
-        Logger.shared.security("VPN unavailable — activating kill switch")
-
-        if protectionEnabled {
+        switch decision.action {
+        case .enable:
             await enableBlocking()
+        case .disable:
+            await disableBlocking()
+        case .none:
+            break
         }
     }
 
