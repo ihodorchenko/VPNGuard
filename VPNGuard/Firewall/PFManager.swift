@@ -8,7 +8,6 @@
 import Combine
 import Foundation
 import ServiceManagement
-import Security
 
 /// Manages PF firewall state via the privileged helper over XPC.
 @MainActor
@@ -29,82 +28,51 @@ final class PFManager: NSObject, ObservableObject {
 
     // MARK: - Helper Installation
 
-    /// Installs or upgrades the privileged helper via SMJobBless.
+    /// Registers the privileged daemon via `SMAppService` (macOS 13+).
+    ///
+    /// The daemon executable is bundled at `Contents/MacOS` and described by a
+    /// property list in `Contents/Library/LaunchDaemons`; the system validates
+    /// the code signatures instead of requiring an inline AuthorizationRef.
     func installHelper() async -> Bool {
-        // Request admin rights for bless / upgrade.
-        guard let auth = createBlessAuthorization() else {
-            lastError = "Authorization failed"
-            Logger.shared.error("Helper installation failed", details: [
-                "Reason": "AuthorizationCreate failed — admin password required"
+        let service = SMAppService.daemon(plistName: Constants.helperPlistName)
+
+        switch service.status {
+        case .enabled:
+            Logger.shared.info("Privileged helper already enabled")
+            helperInstalled = true
+            connectToHelper()
+            return true
+
+        case .requiresApproval:
+            lastError = "Helper requires approval in System Settings → General → Login Items"
+            Logger.shared.error("Helper registration requires user approval", details: [
+                "Reason": lastError ?? ""
             ])
+            helperInstalled = false
             return false
-        }
-        defer { AuthorizationFree(auth, [.destroyRights]) }
 
-        var error: Unmanaged<CFError>?
-        let blessed = SMJobBless(
-            kSMDomainSystemLaunchd,
-            Constants.helperLabel as CFString,
-            auth,
-            &error
-        )
-
-        if !blessed {
-            let cfError = error?.takeRetainedValue()
-            let message = (cfError as Error?)?.localizedDescription ?? "SMJobBless failed"
-            let code = cfError.map { CFErrorGetCode($0) } ?? -1
-
-            // Already installed at same version is OK — still connect.
-            if isHelperRegistered() {
-                Logger.shared.info("Helper already registered — connecting", details: [
-                    "BlessMessage": message,
-                    "Code": "\(code)"
+        case .notRegistered, .notFound:
+            do {
+                try service.register()
+            } catch {
+                lastError = error.localizedDescription
+                Logger.shared.error("Helper registration failed", details: [
+                    "Reason": error.localizedDescription
                 ])
-                helperInstalled = true
-                connectToHelper()
-                return true
+                helperInstalled = false
+                return false
             }
 
-            lastError = message
-            Logger.shared.error("Helper installation failed", details: [
-                "Reason": message,
-                "Code": "\(code)"
-            ])
+            helperInstalled = true
+            Logger.shared.info("Privileged helper registered via SMAppService")
+            connectToHelper()
+            return true
+
+        @unknown default:
+            lastError = "Unknown helper status"
+            helperInstalled = false
             return false
         }
-
-        helperInstalled = true
-        Logger.shared.info("Privileged helper installed/updated via SMJobBless")
-        connectToHelper()
-        return true
-    }
-
-    func isHelperRegistered() -> Bool {
-        FileManager.default.fileExists(
-            atPath: "/Library/PrivilegedHelperTools/\(Constants.helperLabel)"
-        )
-    }
-
-    private func createBlessAuthorization() -> AuthorizationRef? {
-        var authRef: AuthorizationRef?
-        let rightName = kSMRightBlessPrivilegedHelper
-
-        let status: OSStatus = rightName.withCString { namePtr in
-            var item = AuthorizationItem(
-                name: namePtr,
-                valueLength: 0,
-                value: nil,
-                flags: 0
-            )
-            return withUnsafeMutablePointer(to: &item) { itemPtr in
-                var rights = AuthorizationRights(count: 1, items: itemPtr)
-                let flags: AuthorizationFlags = [.interactionAllowed, .preAuthorize, .extendRights]
-                return AuthorizationCreate(&rights, nil, flags, &authRef)
-            }
-        }
-
-        guard status == errAuthorizationSuccess else { return nil }
-        return authRef
     }
 
     // MARK: - XPC Connection

@@ -1,15 +1,15 @@
 #!/bin/bash
-# Removes the installed privileged helper so the next VPNGuard launch
-# can install a fresh copy via SMJobBless.
+# Resets the SMAppService-registered privileged helper so the next VPNGuard
+# launch can register it again.
 set -euo pipefail
 
 LABEL="by.home.VPNGuard.helper"
 
-echo "Removing $LABEL..."
+echo "Booting out $LABEL..."
 sudo launchctl bootout "system/$LABEL" 2>/dev/null || true
-sudo rm -f "/Library/PrivilegedHelperTools/$LABEL"
 sudo rm -f "/Library/LaunchDaemons/$LABEL.plist"
 
-echo "Done. Now rebuild and run VPNGuard from Xcode (⌘R),"
-echo "enter the admin password when prompted, then verify:"
-echo "  sudo launchctl list | grep VPNGuard"
+echo "Done."
+echo "SMAppService keeps its own registration database. If registration still"
+echo "reports it as already registered, open System Settings → General → Login"
+echo "Items, remove VPNGuard, then rebuild and run VPNGuard from Xcode (⌘R)."

@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		B10000010000000000000002 /* by.home.VPNGuard.helper in Copy Helper Tool */ = {isa = PBXBuildFile; fileRef = B10000030000000000000001 /* by.home.VPNGuard.helper */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		B100001C0000000000000001 /* by.home.VPNGuard.helper.plist in Copy LaunchDaemon Plist */ = {isa = PBXBuildFile; fileRef = B100001B0000000000000001 /* by.home.VPNGuard.helper.plist */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -24,12 +25,22 @@
 		B10000060000000000000001 /* Copy Helper Tool */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
-			dstPath = Contents/Library/LaunchServices;
-			dstSubfolderSpec = 1;
+			dstSubfolderSpec = 6;
 			files = (
 				B10000010000000000000002 /* by.home.VPNGuard.helper in Copy Helper Tool */,
 			);
 			name = "Copy Helper Tool";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B100001D0000000000000001 /* Copy LaunchDaemon Plist */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Contents/Library/LaunchDaemons;
+			dstSubfolderSpec = 1;
+			files = (
+				B100001C0000000000000001 /* by.home.VPNGuard.helper.plist in Copy LaunchDaemon Plist */,
+			);
+			name = "Copy LaunchDaemon Plist";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
@@ -37,6 +48,7 @@
 /* Begin PBXFileReference section */
 		ACA9F582300E715F003782DC /* VPNGuard.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VPNGuard.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B10000030000000000000001 /* by.home.VPNGuard.helper */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = by.home.VPNGuard.helper; sourceTree = BUILT_PRODUCTS_DIR; };
+		B100001B0000000000000001 /* by.home.VPNGuard.helper.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = by.home.VPNGuard.helper.plist; path = VPNGuardHelper/by.home.VPNGuard.helper.plist; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -82,6 +94,7 @@
 				ACA9F584300E715F003782DC /* VPNGuard */,
 				B10000070000000000000001 /* VPNGuardHelper */,
 				ACA9F583300E715F003782DC /* Products */,
+				B100001B0000000000000001 /* by.home.VPNGuard.helper.plist */,
 			);
 			sourceTree = "<group>";
 		};
@@ -105,6 +118,7 @@
 				ACA9F57F300E715F003782DC /* Frameworks */,
 				ACA9F580300E715F003782DC /* Resources */,
 				B10000060000000000000001 /* Copy Helper Tool */,
+				B100001D0000000000000001 /* Copy LaunchDaemon Plist */,
 			);
 			buildRules = (
 			);
@@ -413,12 +427,6 @@
 				INFOPLIST_FILE = VPNGuardHelper/Info.plist;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 1.0;
-				OTHER_LDFLAGS = (
-					"-sectcreate",
-					__TEXT,
-					__launchd_plist,
-					"$(SRCROOT)/VPNGuardHelper/by.home.VPNGuard.helper.plist",
-				);
 				PRODUCT_BUNDLE_IDENTIFIER = by.home.VPNGuard.helper;
 				PRODUCT_NAME = by.home.VPNGuard.helper;
 				SKIP_INSTALL = YES;
@@ -440,12 +448,6 @@
 				INFOPLIST_FILE = VPNGuardHelper/Info.plist;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 1.0;
-				OTHER_LDFLAGS = (
-					"-sectcreate",
-					__TEXT,
-					__launchd_plist,
-					"$(SRCROOT)/VPNGuardHelper/by.home.VPNGuard.helper.plist",
-				);
 				PRODUCT_BUNDLE_IDENTIFIER = by.home.VPNGuard.helper;
 				PRODUCT_NAME = by.home.VPNGuard.helper;
 				SKIP_INSTALL = YES;

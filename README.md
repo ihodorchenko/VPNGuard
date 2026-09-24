@@ -11,7 +11,7 @@ Protected by default:
 ```
 ┌─────────────────┐     XPC      ┌──────────────────────┐
 │  VPNGuard.app   │◄────────────►│  VPNGuardHelper      │
-│  (Menu Bar UI)  │              │  (root via SMJobBless)│
+│  (Menu Bar UI)  │              │  (root via SMAppService)│
 └────────┬────────┘              └──────────┬───────────┘
          │                                  │
     VPNMonitor                         pfctl / PF
@@ -45,16 +45,21 @@ VPNGuardHelper/             # Privileged helper tool (root)
 
 - macOS 14.0+
 - Xcode 15+
-- Apple Developer signing (Team ID configured in project)
+- Code signing (Team ID configured in the project) — required for SMAppService
 - VPN client using `utun` interface (WireGuard, Tunnelblick, ProtonVPN, Mullvad)
 
 ## Build & Run
 
 1. Open `VPNGuard.xcodeproj` in Xcode.
 2. Select your Development Team in both targets (**VPNGuard** and **VPNGuardHelper**).
-3. Update `SMPrivilegedExecutables` / `SMAuthorizedClients` in Info.plist files if your Team ID differs from `529YMJVWB5`.
-4. Build and run (**⌘R**).
-5. On first launch, macOS prompts for admin password to install the privileged helper via **SMJobBless**.
+3. Build and run (**⌘R**).
+4. On first launch the app registers the privileged daemon via **SMAppService**
+   (macOS 13+). macOS may ask for approval; if so, allow VPNGuard in
+   **System Settings → General → Login Items** and relaunch.
+
+> Registration requires a code-signed build. An unsigned build from DerivedData,
+> or one signed with a different Team ID than the one that registered the daemon,
+> will fail to register.
 
 ## Menu Bar
 
@@ -151,7 +156,7 @@ Anchor is registered when VPNGuard launches and installs the helper. If you see 
 # 1. Check if anchor exists
 sudo pfctl -s Anchors | grep vpnguard
 
-# 2. If empty — launch VPNGuard.app first (admin password required on first run)
+# 2. If empty — launch VPNGuard.app first (approve the daemon on first run)
 #    Then re-check:
 sudo pfctl -a com.apple/vpnguard -s rules
 
@@ -168,7 +173,8 @@ block drop quick proto tcp to 104.x.x.x
 ## Security
 
 - No `sudo` in the main app — all privileged operations go through **VPNGuardHelper**.
-- Helper installed via **SMJobBless** with code signing verification.
+- Helper registered and managed by **SMAppService** (macOS 13+); the system
+  validates the app and daemon code signatures.
 - Communication over **XPC** with Mach service `by.home.VPNGuard.helper`.
 - User password is never stored.
 
@@ -188,9 +194,9 @@ Anchor: `com.apple/vpnguard` (uses the system `com.apple/*` namespace — no /et
 
 | Problem | Solution |
 |---------|----------|
-| Helper install fails | Ensure both targets are signed with the same Team ID |
+| Helper registration fails | Sign both targets with the same Team ID; approve VPNGuard in System Settings → General → Login Items |
 | Blocking not working | Check logs, verify helper is running: `sudo launchctl list \| grep VPNGuard` |
-| `pfctl: DIOCGETRULES: Invalid argument` | Anchor not installed yet — launch VPNGuard.app first (admin prompt), then retry |
+| `pfctl: DIOCGETRULES: Invalid argument` | Anchor not installed yet — launch VPNGuard.app first (approve the daemon), then retry |
 | False VPN detection | Set custom interface in Settings |
 | IPs outdated | Use **Refresh IPs** from menu |
 

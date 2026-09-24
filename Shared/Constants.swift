@@ -15,6 +15,10 @@ nonisolated enum Constants {
     static let helperBundleID = "by.home.VPNGuard.helper"
     static let helperLabel = "by.home.VPNGuard.helper"
 
+    /// Bundled LaunchDaemon property list used by SMAppService
+    /// (`Contents/Library/LaunchDaemons/<name>`).
+    static let helperPlistName = "by.home.VPNGuard.helper.plist"
+
     // MARK: - Paths
 
     /// PF rules file written by the privileged helper.

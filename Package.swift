@@ -6,10 +6,9 @@
 //  Standalone test harness for the pure logic that lives in `Shared/`.
 //
 //  The app itself is an Xcode target; running unit tests hosted in the app is
-//  undesirable because AppDelegate performs privileged helper installation via
-//  SMJobBless (admin prompt) on launch. This package compiles only the
-//  dependency-free `Shared/` sources so tests can run with `swift test`
-//  without launching the app.
+//  undesirable because AppDelegate registers the privileged helper on launch.
+//  This package compiles only the dependency-free `Shared/` sources so tests can
+//  run with `swift test` without launching the app.
 //
 
 import PackageDescription
