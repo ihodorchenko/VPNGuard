@@ -14,11 +14,14 @@ struct HelpView: View {
     @State private var snapshot: DiagnosticsSnapshot?
     @State private var isRunningChecks = false
     @State private var copiedCommand: String?
+    @State private var helperStatus: String?
+    @State private var isQueryingHelper = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 diagnosticsSection
+                helperStatusSection
                 terminalChecksSection
                 manualRemovalSection
             }
@@ -110,6 +113,40 @@ struct HelpView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+    }
+
+    // MARK: - Helper status (XPC)
+
+    private var helperStatusSection: some View {
+        GroupBox("Статус helper (XPC)") {
+            VStack(alignment: .leading, spacing: 10) {
+                Button(isQueryingHelper ? "Опрос…" : "Опросить helper") {
+                    Task { await queryHelper() }
+                }
+                .disabled(isQueryingHelper)
+
+                if let helperStatus {
+                    Text(helperStatus)
+                        .font(.system(.caption, design: .monospaced))
+                        .textSelection(.enabled)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("Запрашивает у привилегированного helper его состояние по XPC — без sudo.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func queryHelper() async {
+        isQueryingHelper = true
+        defer { isQueryingHelper = false }
+
+        let response = await PFManager.shared.queryHelperStatus()
+        let blocking = response.blockingActive ? "BLOCKING" : "idle"
+        helperStatus = "\(response.success ? "OK" : "FAIL"): \(response.message) [\(blocking)]"
     }
 
     // MARK: - Terminal

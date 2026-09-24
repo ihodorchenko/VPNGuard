@@ -204,6 +204,12 @@ final class PFManager: NSObject, ObservableObject {
         }
     }
 
+    /// Asks the privileged helper for its own view of the anchor and blocking
+    /// flag over XPC. Unlike the sudo-based checks, this needs no admin rights.
+    func queryHelperStatus() async -> HelperResponse {
+        await sendCommand(.getStatus, ips: [], config: "")
+    }
+
     /// Stops reconnect attempts and closes the helper XPC connection.
     func shutdown() {
         reconnectTask?.cancel()
