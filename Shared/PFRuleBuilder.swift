@@ -8,7 +8,7 @@
 import Foundation
 
 /// Generates PF configuration content for the kill switch.
-final class PFRuleBuilder: Sendable {
+nonisolated final class PFRuleBuilder: Sendable {
 
     static let shared = PFRuleBuilder()
 

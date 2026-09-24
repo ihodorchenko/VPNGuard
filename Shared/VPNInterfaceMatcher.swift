@@ -9,7 +9,7 @@
 
 import Foundation
 
-enum VPNInterfaceMatcher {
+nonisolated enum VPNInterfaceMatcher {
 
     /// Builds the list of interface prefixes that count as a VPN.
     ///

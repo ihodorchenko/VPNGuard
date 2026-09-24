@@ -8,7 +8,7 @@
 
 import Foundation
 
-enum Timeout {
+nonisolated enum Timeout {
 
     /// Returns the operation's result, or `nil` if it did not finish within
     /// `seconds`. The operation keeps running in the background afterwards —

@@ -5,7 +5,7 @@
 //  Created by Igor hodorchenko on 20/07/2026.
 //
 
-enum VPNState {
+nonisolated enum VPNState {
 
     case connected
 

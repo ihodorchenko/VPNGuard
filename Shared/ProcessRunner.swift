@@ -9,7 +9,7 @@
 import Foundation
 import Darwin
 
-struct ProcessResult: Equatable {
+nonisolated struct ProcessResult: Equatable {
     /// False when the executable could not be launched at all.
     let launched: Bool
     let exitCode: Int32
@@ -19,7 +19,7 @@ struct ProcessResult: Equatable {
     let timedOut: Bool
 }
 
-enum ProcessRunner {
+nonisolated enum ProcessRunner {
 
     /// Runs an executable synchronously, capturing merged stdout/stderr, and
     /// terminates it if it exceeds `timeout`. Callers can therefore never block
@@ -92,7 +92,7 @@ enum ProcessRunner {
 }
 
 /// Thread-safe byte accumulator for a process pipe.
-private final class OutputBuffer: @unchecked Sendable {
+private nonisolated final class OutputBuffer: @unchecked Sendable {
     private let lock = NSLock()
     private var data = Data()
 

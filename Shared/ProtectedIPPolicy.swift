@@ -10,7 +10,7 @@
 import Foundation
 
 /// Outcome of applying a freshly resolved IP set to the currently protected IPs.
-enum ProtectedIPDecision: Equatable {
+nonisolated enum ProtectedIPDecision: Equatable {
     /// No protected hosts configured — nothing to protect.
     case noHosts
     /// Fresh resolution succeeded; replace the set with these IPs.
@@ -22,7 +22,7 @@ enum ProtectedIPDecision: Equatable {
     case unresolved
 }
 
-enum ProtectedIPPolicy {
+nonisolated enum ProtectedIPPolicy {
 
     /// Decides what the protected IP set should become after a refresh.
     ///

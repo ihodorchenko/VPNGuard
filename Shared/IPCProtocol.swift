@@ -9,7 +9,7 @@
 import Foundation
 
 /// Commands sent from the main app to the privileged helper.
-enum HelperCommand: Int, Sendable {
+nonisolated enum HelperCommand: Int, Sendable {
     case enableBlock = 1
     case disableBlock = 2
     case refreshRules = 3
@@ -18,7 +18,7 @@ enum HelperCommand: Int, Sendable {
 }
 
 /// In-process response model (not sent over XPC as an object).
-struct HelperResponse: Sendable {
+nonisolated struct HelperResponse: Sendable {
     let success: Bool
     let message: String
     let blockingActive: Bool

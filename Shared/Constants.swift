@@ -7,7 +7,7 @@
 
 import Foundation
 
-enum Constants {
+nonisolated enum Constants {
 
     // MARK: - Bundle Identifiers
 

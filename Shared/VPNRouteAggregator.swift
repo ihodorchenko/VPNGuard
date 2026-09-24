@@ -9,12 +9,12 @@
 import Foundation
 
 /// Whether traffic to the protected hosts is currently routed through the VPN.
-enum VPNRouteAggregation: Equatable {
+nonisolated enum VPNRouteAggregation: Equatable {
     case connected
     case disconnected
 }
 
-enum VPNRouteAggregator {
+nonisolated enum VPNRouteAggregator {
 
     /// Aggregates the per-host route checks performed by the monitor.
     ///

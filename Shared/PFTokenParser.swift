@@ -8,7 +8,7 @@
 
 import Foundation
 
-enum PFTokenParser {
+nonisolated enum PFTokenParser {
 
     /// Extracts the reference token from `pfctl -E` output, which looks like:
     ///

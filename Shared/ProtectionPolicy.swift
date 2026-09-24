@@ -10,19 +10,19 @@
 import Foundation
 
 /// What the engine should do about PF blocking after a state evaluation.
-enum BlockingAction: Equatable {
+nonisolated enum BlockingAction: Equatable {
     case none
     case enable
     case disable
 }
 
 /// The outcome of evaluating a VPN state change.
-struct ProtectionDecision: Equatable {
+nonisolated struct ProtectionDecision: Equatable {
     let state: VPNState
     let action: BlockingAction
 }
 
-enum ProtectionPolicy {
+nonisolated enum ProtectionPolicy {
 
     /// Decides the next VPN state and blocking action.
     ///

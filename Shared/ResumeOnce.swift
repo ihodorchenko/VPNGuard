@@ -8,7 +8,7 @@
 
 import Foundation
 
-final class ResumeOnce: @unchecked Sendable {
+nonisolated final class ResumeOnce: @unchecked Sendable {
     private let lock = NSLock()
     private var done = false
 
