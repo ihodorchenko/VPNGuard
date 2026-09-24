@@ -45,25 +45,22 @@ final class VPNMonitor {
         defer { isChecking = false }
 
         let hosts = Rules.shared.protectedHosts
-        guard !hosts.isEmpty else {
-            await engine.handleVPNDisconnected()
-            return
-        }
-
-        var allViaVPN = true
+        var checks: [Bool] = []
+        checks.reserveCapacity(hosts.count)
 
         for host in hosts {
             let viaVPN = await RouteChecker.shared.isVPNRouteAsync(for: host)
+            checks.append(viaVPN)
             if !viaVPN {
-                allViaVPN = false
                 break
             }
         }
 
         // Engine is edge-triggered: repeated same-status calls are no-ops.
-        if allViaVPN {
+        switch VPNRouteAggregator.aggregate(checks: checks) {
+        case .connected:
             await engine.handleVPNConnected()
-        } else {
+        case .disconnected:
             await engine.handleVPNDisconnected()
         }
     }
