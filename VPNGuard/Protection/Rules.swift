@@ -67,6 +67,14 @@ final class Rules: ObservableObject {
     /// Resolves all protected hosts and updates the IP set.
     @discardableResult
     func refresh() async -> Set<String> {
+        // No hosts configured → nothing to protect; clear the set explicitly.
+        guard !protectedHosts.isEmpty else {
+            protectedIPs = []
+            ConnectionRegistry.shared.setProtectedIPCount(0)
+            Logger.shared.info("No protected hosts configured")
+            return []
+        }
+
         var newIPs = Set<String>()
 
         for host in protectedHosts {
@@ -76,6 +84,18 @@ final class Rules: ObservableObject {
                 "Host": host,
                 "IPs": ips.joined(separator: ", ")
             ])
+        }
+
+        // Resolution failed for every host (e.g. the VPN just dropped and DNS is
+        // unreachable). Publishing an empty set would silently disable the kill
+        // switch — fail open — so keep the last known-good IPs instead.
+        if newIPs.isEmpty {
+            Logger.shared.error("DNS refresh returned no IPs — keeping last known set", details: [
+                "Hosts": protectedHosts.joined(separator: ", "),
+                "KeptCount": "\(protectedIPs.count)"
+            ])
+            ConnectionRegistry.shared.setProtectedIPCount(protectedIPs.count)
+            return protectedIPs
         }
 
         protectedIPs = newIPs

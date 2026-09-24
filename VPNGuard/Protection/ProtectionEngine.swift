@@ -130,7 +130,19 @@ final class ProtectionEngine: ObservableObject {
             _ = await Rules.shared.refresh()
         }
 
-        await pfManager.enableBlock(ips: Rules.shared.protectedIPs)
+        let ips = Rules.shared.protectedIPs
+        // Never report "blocking" without any target IPs — that would be a silent
+        // fail-open. Report failure and let the next poll retry once DNS recovers.
+        guard !ips.isEmpty else {
+            Logger.shared.error(
+                "Kill switch could not activate — no protected IPs resolved",
+                details: ["Hint": "DNS resolution failed; retrying on next poll"]
+            )
+            isBlocking = false
+            return
+        }
+
+        await pfManager.enableBlock(ips: ips)
         isBlocking = pfManager.blockingActive
 
         if isBlocking {

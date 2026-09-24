@@ -70,6 +70,15 @@ final class HelperTool: NSObject, VPNGuardHelperProtocol {
     // MARK: - Blocking
 
     private func enableBlocking(config: String, ips: [String]) -> HelperResponse {
+        // Defense in depth: never load an empty ruleset and call it "blocking".
+        guard !ips.isEmpty else {
+            return HelperResponse(
+                success: false,
+                message: "Refusing to enable blocking with an empty IP set",
+                blockingActive: false
+            )
+        }
+
         do {
             try pfExecutor.writeConfig(content: config)
             try pfExecutor.enablePF()
