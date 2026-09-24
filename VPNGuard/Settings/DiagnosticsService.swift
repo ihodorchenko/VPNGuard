@@ -24,7 +24,7 @@ struct DiagnosticsSnapshot: Sendable {
     let checkedAt: Date
 }
 
-enum DiagnosticsService {
+nonisolated enum DiagnosticsService {
 
     static func run(
         vpnState: String,
@@ -106,74 +106,63 @@ enum DiagnosticsService {
     }
 
     private static func readPFRules() async -> (output: String, readable: Bool) {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/sbin/pfctl")
-        process.arguments = ["-a", Constants.pfAnchorName, "-s", "rules"]
+        let result = ProcessRunner.run(
+            executable: "/sbin/pfctl",
+            arguments: ["-a", Constants.pfAnchorName, "-s", "rules"],
+            timeout: Constants.commandTimeout
+        )
 
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = pipe
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            let text = String(data: data, encoding: .utf8)?
-                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-
-            if process.terminationStatus == 0 {
-                if text.isEmpty {
-                    return ("(no rules in anchor — traffic not blocked by PF)", true)
-                }
-                return (text, true)
-            }
-
-            if text.lowercased().contains("permission") || text.lowercased().contains("denied") {
-                return (
-                    "Requires sudo — use Terminal command from Help section below.",
-                    false
-                )
-            }
-
-            return (text.isEmpty ? "pfctl failed (exit \(process.terminationStatus))" : text, false)
-        } catch {
-            return (error.localizedDescription, false)
+        guard result.launched else {
+            return ("pfctl could not be launched", false)
         }
+        if result.timedOut {
+            return ("pfctl timed out after \(Int(Constants.commandTimeout))s", false)
+        }
+
+        let text = result.output.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if result.exitCode == 0 {
+            if text.isEmpty {
+                return ("(no rules in anchor — traffic not blocked by PF)", true)
+            }
+            return (text, true)
+        }
+
+        if text.lowercased().contains("permission") || text.lowercased().contains("denied") {
+            return ("Requires sudo — use Terminal command from Help section below.", false)
+        }
+
+        return (text.isEmpty ? "pfctl failed (exit \(result.exitCode))" : text, false)
     }
 
     // MARK: - Helper
 
     private static func checkHelperProcess() async -> (running: Bool, detail: String) {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-        process.arguments = ["list"]
+        let result = ProcessRunner.run(
+            executable: "/bin/launchctl",
+            arguments: ["list"],
+            timeout: Constants.commandTimeout
+        )
 
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = Pipe()
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            let text = String(data: data, encoding: .utf8) ?? ""
-            let label = Constants.helperLabel
-
-            for line in text.components(separatedBy: .newlines) {
-                if line.contains(label) {
-                    let parts = line.split(whereSeparator: \.isWhitespace)
-                    if parts.count >= 3, parts[1] == "0" {
-                        return (true, "Running (PID \(parts[0]))")
-                    }
-                    return (false, "Registered but not running: \(line.trimmingCharacters(in: .whitespaces))")
-                }
-            }
-
-            return (false, "Not found in launchctl list")
-        } catch {
-            return (false, error.localizedDescription)
+        guard result.launched else {
+            return (false, "launchctl could not be launched")
         }
+        if result.timedOut {
+            return (false, "launchctl timed out")
+        }
+
+        let label = Constants.helperLabel
+
+        for line in result.output.components(separatedBy: .newlines) {
+            if line.contains(label) {
+                let parts = line.split(whereSeparator: \.isWhitespace)
+                if parts.count >= 3, parts[1] == "0" {
+                    return (true, "Running (PID \(parts[0]))")
+                }
+                return (false, "Registered but not running: \(line.trimmingCharacters(in: .whitespaces))")
+            }
+        }
+
+        return (false, "Not found in launchctl list")
     }
 }
