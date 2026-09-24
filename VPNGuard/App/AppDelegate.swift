@@ -25,6 +25,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             monitor: vpnMonitor
         )
 
+        registerSleepWakeObservers()
+
         Task { @MainActor in
             await bootstrap()
         }
@@ -68,6 +70,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             DispatchQueue.main.sync(execute: runCleanup)
         }
+    }
+
+    // MARK: - Sleep / Wake
+
+    /// The app kept no notion of system sleep, so a check or XPC round-trip
+    /// interrupted by sleep could leave it permanently stuck. Resume cleanly.
+    private func registerSleepWakeObservers() {
+        let center = NSWorkspace.shared.notificationCenter
+        center.addObserver(
+            self,
+            selector: #selector(systemWillSleep),
+            name: NSWorkspace.willSleepNotification,
+            object: nil
+        )
+        center.addObserver(
+            self,
+            selector: #selector(systemDidWake),
+            name: NSWorkspace.didWakeNotification,
+            object: nil
+        )
+    }
+
+    @objc private func systemWillSleep() {
+        Logger.shared.info("System will sleep — pausing checks")
+        vpnMonitor.stop()
+    }
+
+    @objc private func systemDidWake() {
+        Logger.shared.info("System woke — resuming checks")
+        vpnMonitor.reset()
+        protectionEngine.resetAfterWake()
+        // The XPC connection may be stale after wake.
+        PFManager.shared.connectToHelper()
+        vpnMonitor.start()
     }
 
     // MARK: - Bootstrap

@@ -125,6 +125,12 @@ final class ProtectionEngine: ObservableObject {
         await pushIPsIfNeeded(Rules.shared.protectedIPs)
     }
 
+    /// Clears the transition guard so blocking changes resume after the machine
+    /// wakes (an XPC round-trip interrupted by sleep would otherwise leave it set).
+    func resetAfterWake() {
+        isTransitioning = false
+    }
+
     /// Clears PF block rules when the application is quitting.
     func cleanupOnShutdown() async {
         isTransitioning = false

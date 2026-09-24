@@ -20,6 +20,7 @@ final class VPNMonitor {
     }
 
     func start() {
+        timer?.invalidate()
         Task { await performCheck() }
 
         timer = Timer.scheduledTimer(
@@ -35,6 +36,12 @@ final class VPNMonitor {
     func stop() {
         timer?.invalidate()
         timer = nil
+    }
+
+    /// Clears the in-flight guard so checks resume after the machine wakes
+    /// (a check started before sleep may never have returned).
+    func reset() {
+        isChecking = false
     }
 
     // MARK: - Private
