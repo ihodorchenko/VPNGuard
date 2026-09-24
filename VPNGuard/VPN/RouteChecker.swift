@@ -47,27 +47,21 @@ final class RouteChecker: Sendable {
     // MARK: - Private
 
     private func runRoute(host: String) -> String? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/sbin/route")
-        process.arguments = ["-n", "get", host]
+        let result = ProcessRunner.run(
+            executable: "/sbin/route",
+            arguments: ["-n", "get", host],
+            timeout: Constants.commandTimeout
+        )
 
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = pipe
-
-        do {
-            try process.run()
-        } catch {
-            Logger.shared.error("route command failed", details: [
-                "Host": host,
-                "Error": error.localizedDescription
-            ])
+        guard result.launched else {
+            Logger.shared.error("route command failed to launch", details: ["Host": host])
             return nil
         }
-
-        process.waitUntilExit()
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        return String(data: data, encoding: .utf8)
+        if result.timedOut {
+            Logger.shared.error("route command timed out", details: ["Host": host])
+            return nil
+        }
+        return result.output
     }
 
     private func parseInterface(from text: String) -> Bool {

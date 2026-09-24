@@ -142,26 +142,30 @@ final class PFExecutor {
 
     @discardableResult
     private func runPFCTL(_ arguments: [String]) throws -> String {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/sbin/pfctl")
-        process.arguments = arguments
+        let command = "pfctl \(arguments.joined(separator: " "))"
+        let result = ProcessRunner.run(
+            executable: "/sbin/pfctl",
+            arguments: arguments,
+            timeout: Constants.commandTimeout
+        )
 
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = pipe
+        guard result.launched else {
+            logError("\(command) failed to launch")
+            throw PFExecutorError.commandFailed(command, -1, "failed to launch")
+        }
 
-        try process.run()
-        process.waitUntilExit()
+        if result.timedOut {
+            logError("\(command) timed out")
+            throw PFExecutorError.commandFailed(command, -1, "timed out")
+        }
 
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        let output = String(data: data, encoding: .utf8) ?? ""
-        let exitCode = process.terminationStatus
+        let output = result.output
 
-        if exitCode != 0 {
-            logError("pfctl \(arguments.joined(separator: " ")) exit \(exitCode): \(output)")
+        if result.exitCode != 0 {
+            logError("\(command) exit \(result.exitCode): \(output)")
             throw PFExecutorError.commandFailed(
-                "pfctl \(arguments.joined(separator: " "))",
-                exitCode,
+                command,
+                result.exitCode,
                 output.trimmingCharacters(in: .whitespacesAndNewlines)
             )
         }

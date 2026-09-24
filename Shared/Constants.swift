@@ -55,6 +55,17 @@ enum Constants {
     /// Interval between DNS refresh cycles (seconds).
     static let dnsRefreshInterval: TimeInterval = 300.0
 
+    // MARK: - Timeouts
+
+    /// Hard timeout for subprocess calls (`route`, `pfctl`, `launchctl`).
+    static let commandTimeout: TimeInterval = 5.0
+
+    /// How long to wait for DNS resolution before giving up (returns no IPs).
+    static let dnsTimeout: TimeInterval = 5.0
+
+    /// How long to wait for an XPC reply before treating it as failed.
+    static let xpcReplyTimeout: TimeInterval = 8.0
+
     // MARK: - Logging Limits
 
     /// Max size of a single daily log file before it is truncated.
