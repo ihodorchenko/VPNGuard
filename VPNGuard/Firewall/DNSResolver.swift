@@ -23,11 +23,6 @@ final class DNSResolver: Sendable {
         }
     }
 
-    /// Synchronous resolve for legacy call sites.
-    func resolveSync(host: String) -> [String] {
-        lookup(host: host)
-    }
-
     // MARK: - Private
 
     private func lookup(host: String) -> [String] {

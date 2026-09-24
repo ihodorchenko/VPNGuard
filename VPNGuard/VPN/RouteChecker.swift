@@ -44,9 +44,16 @@ final class RouteChecker: Sendable {
             prefixes.append(custom)
         }
 
-        let defaultPrefix = UserDefaults.standard.string(
+        let configuredPrefix = (UserDefaults.standard.string(
             forKey: Constants.DefaultsKey.vpnInterfacePrefix
-        ) ?? Constants.defaultVPNInterfacePrefix
+        ) ?? Constants.defaultVPNInterfacePrefix)
+            .trimmingCharacters(in: .whitespaces)
+
+        // An empty prefix would make `hasPrefix("")` match every interface,
+        // silently disabling protection — fall back to the default instead.
+        let defaultPrefix = configuredPrefix.isEmpty
+            ? Constants.defaultVPNInterfacePrefix
+            : configuredPrefix
 
         if !prefixes.contains(defaultPrefix) {
             prefixes.append(defaultPrefix)
