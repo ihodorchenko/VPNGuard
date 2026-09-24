@@ -125,10 +125,17 @@ final class ProtectionEngine: ObservableObject {
         await pushIPsIfNeeded(Rules.shared.protectedIPs)
     }
 
-    /// Clears the transition guard so blocking changes resume after the machine
-    /// wakes (an XPC round-trip interrupted by sleep would otherwise leave it set).
-    func resetAfterWake() {
+    /// Re-syncs the local blocking flag with the privileged helper after wake
+    /// and clears the transition guard. The helper is the source of truth for
+    /// whether PF rules are actually loaded, so this prevents the engine from
+    /// believing it is blocking when it is not (or vice versa).
+    func resyncAfterWake() async {
         isTransitioning = false
+        isBlocking = await pfManager.resyncBlockingState()
+        appliedIPs = isBlocking ? Rules.shared.protectedIPs : []
+        Logger.shared.info("Resynced blocking state after wake", details: [
+            "Blocking": isBlocking ? "true" : "false"
+        ])
     }
 
     /// Clears PF block rules when the application is quitting.

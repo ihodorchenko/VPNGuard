@@ -210,6 +210,19 @@ final class PFManager: NSObject, ObservableObject {
         await sendCommand(.getStatus, ips: [], config: "")
     }
 
+    /// Re-syncs `blockingActive` with the helper and returns the reconciled
+    /// value. Used after wake, where the local flag may no longer match reality.
+    @discardableResult
+    func resyncBlockingState() async -> Bool {
+        let response = await sendCommand(.getStatus, ips: [], config: "")
+        blockingActive = BlockingStateReconciler.reconcile(
+            success: response.success,
+            helperBlockingActive: response.blockingActive,
+            current: blockingActive
+        )
+        return blockingActive
+    }
+
     /// Stops reconnect attempts and closes the helper XPC connection.
     func shutdown() {
         reconnectTask?.cancel()

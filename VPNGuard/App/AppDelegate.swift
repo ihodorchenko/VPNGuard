@@ -100,10 +100,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func systemDidWake() {
         Logger.shared.info("System woke — resuming checks")
         vpnMonitor.reset()
-        protectionEngine.resetAfterWake()
-        // The XPC connection may be stale after wake.
-        PFManager.shared.connectToHelper()
-        vpnMonitor.start()
+        Task { @MainActor in
+            // The XPC connection may be stale after wake.
+            PFManager.shared.connectToHelper()
+            // Trust the helper about whether PF rules are actually loaded before
+            // the next check decides anything.
+            await protectionEngine.resyncAfterWake()
+            vpnMonitor.start()
+        }
     }
 
     // MARK: - Bootstrap
