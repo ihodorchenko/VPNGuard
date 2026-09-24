@@ -24,9 +24,17 @@ final class ProtectionEngine: ObservableObject {
     private var appliedIPs: Set<String> = []
 
     init() {
-        protectionEnabled = UserDefaults.standard.object(
+        let defaults = UserDefaults.standard
+        let autoStart = defaults.object(
+            forKey: Constants.DefaultsKey.autoStart
+        ) as? Bool ?? true
+        let remembered = defaults.object(
             forKey: Constants.DefaultsKey.protectionEnabled
         ) as? Bool ?? true
+
+        // "Auto start protection" off means the kill switch boots disabled and
+        // must be enabled manually from the menu.
+        protectionEnabled = autoStart && remembered
 
         observeProtectedIPs()
     }
