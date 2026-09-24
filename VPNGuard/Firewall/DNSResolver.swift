@@ -14,16 +14,29 @@ final class DNSResolver: Sendable {
     private init() {}
 
     /// Resolves a hostname to all IP addresses (IPv4 and IPv6).
-    func resolve(host: String) async -> [String] {
-        await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .utility).async {
-                let addresses = self.lookup(host: host)
-                continuation.resume(returning: addresses)
-            }
+    ///
+    /// Bounded by `timeout`: a stuck resolver (common after wake with broken
+    /// DNS) yields no addresses instead of blocking the caller forever.
+    func resolve(host: String, timeout: TimeInterval = Constants.dnsTimeout) async -> [String] {
+        let addresses = await Timeout.race(seconds: timeout) {
+            await self.lookupOffMain(host: host)
         }
+
+        if addresses == nil {
+            Logger.shared.error("DNS resolution timed out", details: ["Host": host])
+        }
+        return addresses ?? []
     }
 
     // MARK: - Private
+
+    private func lookupOffMain(host: String) async -> [String] {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .utility).async {
+                continuation.resume(returning: self.lookup(host: host))
+            }
+        }
+    }
 
     private func lookup(host: String) -> [String] {
         var result: [String] = []

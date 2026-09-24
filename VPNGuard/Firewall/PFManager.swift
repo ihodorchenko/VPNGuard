@@ -237,19 +237,18 @@ final class PFManager: NSObject, ObservableObject {
             )
         }
 
+        let currentBlocking = blockingActive
         return await withCheckedContinuation { continuation in
-            var resumed = false
-            let finish: (HelperResponse) -> Void = { response in
-                guard !resumed else { return }
-                resumed = true
-                continuation.resume(returning: response)
+            let once = ResumeOnce()
+            let finish: @Sendable (HelperResponse) -> Void = { response in
+                once.run { continuation.resume(returning: response) }
             }
 
             let proxy = conn.remoteObjectProxyWithErrorHandler { error in
                 finish(HelperResponse(
                     success: false,
                     message: error.localizedDescription,
-                    blockingActive: false
+                    blockingActive: currentBlocking
                 ))
             } as? VPNGuardHelperProtocol
 
@@ -257,9 +256,22 @@ final class PFManager: NSObject, ObservableObject {
                 finish(HelperResponse(
                     success: false,
                     message: "Invalid XPC proxy",
-                    blockingActive: false
+                    blockingActive: currentBlocking
                 ))
                 return
+            }
+
+            // Never wait forever: a reply lost across sleep/wake must not leave
+            // the caller (and isTransitioning) stuck.
+            Task {
+                try? await Task.sleep(
+                    nanoseconds: UInt64(Constants.xpcReplyTimeout * 1_000_000_000)
+                )
+                finish(HelperResponse(
+                    success: false,
+                    message: "XPC reply timed out",
+                    blockingActive: currentBlocking
+                ))
             }
 
             proxy.executeCommand(
