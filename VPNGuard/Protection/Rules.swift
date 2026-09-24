@@ -67,45 +67,55 @@ final class Rules: ObservableObject {
     /// Resolves all protected hosts and updates the IP set.
     @discardableResult
     func refresh() async -> Set<String> {
-        // No hosts configured → nothing to protect; clear the set explicitly.
-        guard !protectedHosts.isEmpty else {
-            protectedIPs = []
-            ConnectionRegistry.shared.setProtectedIPCount(0)
-            Logger.shared.info("No protected hosts configured")
-            return []
-        }
-
-        var newIPs = Set<String>()
+        var resolved = Set<String>()
 
         for host in protectedHosts {
             let ips = await DNSResolver.shared.resolve(host: host)
-            newIPs.formUnion(ips)
+            resolved.formUnion(ips)
             Logger.shared.debug("Resolved host", details: [
                 "Host": host,
                 "IPs": ips.joined(separator: ", ")
             ])
         }
 
+        let decision = ProtectedIPPolicy.decide(
+            hosts: protectedHosts,
+            resolved: resolved,
+            previous: protectedIPs
+        )
+
+        switch decision {
+        case .noHosts:
+            protectedIPs = []
+            ConnectionRegistry.shared.setProtectedIPCount(0)
+            Logger.shared.info("No protected hosts configured")
+
+        case .updated(let ips):
+            protectedIPs = ips
+            ConnectionRegistry.shared.setProtectedIPCount(ips.count)
+            Logger.shared.info("Protected IPs updated", details: [
+                "Count": "\(ips.count)",
+                "Hosts": protectedHosts.joined(separator: ", ")
+            ])
+
         // Resolution failed for every host (e.g. the VPN just dropped and DNS is
-        // unreachable). Publishing an empty set would silently disable the kill
-        // switch — fail open — so keep the last known-good IPs instead.
-        if newIPs.isEmpty {
+        // unreachable). Keep the last known-good IPs instead of failing open.
+        case .keptLastKnown(let ips):
+            protectedIPs = ips
+            ConnectionRegistry.shared.setProtectedIPCount(ips.count)
             Logger.shared.error("DNS refresh returned no IPs — keeping last known set", details: [
                 "Hosts": protectedHosts.joined(separator: ", "),
-                "KeptCount": "\(protectedIPs.count)"
+                "KeptCount": "\(ips.count)"
             ])
-            ConnectionRegistry.shared.setProtectedIPCount(protectedIPs.count)
-            return protectedIPs
+
+        case .unresolved:
+            protectedIPs = []
+            ConnectionRegistry.shared.setProtectedIPCount(0)
+            Logger.shared.error("DNS refresh returned no IPs", details: [
+                "Hosts": protectedHosts.joined(separator: ", ")
+            ])
         }
 
-        protectedIPs = newIPs
-        ConnectionRegistry.shared.setProtectedIPCount(newIPs.count)
-
-        Logger.shared.info("Protected IPs updated", details: [
-            "Count": "\(newIPs.count)",
-            "Hosts": protectedHosts.joined(separator: ", ")
-        ])
-
-        return newIPs
+        return protectedIPs
     }
 }
