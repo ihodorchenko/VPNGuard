@@ -19,11 +19,31 @@ final class ProtectionEngine: ObservableObject {
 
     private let pfManager = PFManager.shared
     private var isTransitioning = false
+    private var cancellables = Set<AnyCancellable>()
+    /// Last IP set pushed into PF while blocking — avoids redundant pfctl/XPC.
+    private var appliedIPs: Set<String> = []
 
     init() {
         protectionEnabled = UserDefaults.standard.object(
             forKey: Constants.DefaultsKey.protectionEnabled
         ) as? Bool ?? true
+
+        observeProtectedIPs()
+    }
+
+    /// While blocking, IPs resolved by the periodic DNS refresh must reach PF —
+    /// otherwise rotated CDN addresses stay reachable (kill switch bypass).
+    private func observeProtectedIPs() {
+        Rules.shared.$protectedIPs
+            .dropFirst()
+            .removeDuplicates()
+            .sink { [weak self] ips in
+                guard let self else { return }
+                Task { @MainActor in
+                    await self.pushIPsIfNeeded(ips)
+                }
+            }
+            .store(in: &cancellables)
     }
 
     var isProtected: Bool {
@@ -101,10 +121,9 @@ final class ProtectionEngine: ObservableObject {
     }
 
     func refreshIPsAndRules() async {
-        let ips = await Rules.shared.refresh()
-        // Only push new IPs to PF while actively blocking.
-        guard isBlocking else { return }
-        await pfManager.refreshRules(ips: ips)
+        _ = await Rules.shared.refresh()
+        // Only pushes while actively blocking, and only if the set changed.
+        await pushIPsIfNeeded(Rules.shared.protectedIPs)
     }
 
     /// Clears PF block rules when the application is quitting.
@@ -112,8 +131,19 @@ final class ProtectionEngine: ObservableObject {
         isTransitioning = false
         await pfManager.disableBlock()
         isBlocking = pfManager.blockingActive
+        appliedIPs = []
         ConnectionRegistry.shared.resetBlockedCount()
         Logger.shared.info("Shutdown cleanup — PF rules cleared")
+    }
+
+    /// Pushes the current IP set into PF when blocking is active and the set
+    /// changed. No-op otherwise, so steady polls cost nothing.
+    private func pushIPsIfNeeded(_ ips: Set<String>) async {
+        guard isBlocking, !isTransitioning, !ips.isEmpty else { return }
+        guard ips != appliedIPs else { return }
+
+        await pfManager.refreshRules(ips: ips)
+        appliedIPs = ips
     }
 
     // MARK: - Blocking (guards against redundant XPC/pfctl)
@@ -144,6 +174,7 @@ final class ProtectionEngine: ObservableObject {
 
         await pfManager.enableBlock(ips: ips)
         isBlocking = pfManager.blockingActive
+        appliedIPs = isBlocking ? ips : []
 
         if isBlocking {
             for host in Rules.shared.protectedHosts {
@@ -167,6 +198,7 @@ final class ProtectionEngine: ObservableObject {
         isBlocking = pfManager.blockingActive
 
         if !isBlocking {
+            appliedIPs = []
             ConnectionRegistry.shared.resetBlockedCount()
             Logger.shared.info("Kill switch cleared — traffic allowed")
         }
