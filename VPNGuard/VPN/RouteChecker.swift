@@ -22,6 +22,16 @@ final class RouteChecker: Sendable {
         return parseInterface(from: output)
     }
 
+    /// Async variant that runs the `route` process off the main thread so the
+    /// menu bar UI stays responsive while a check is in flight.
+    func isVPNRouteAsync(for host: String) async -> Bool {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .utility).async {
+                continuation.resume(returning: self.isVPNRoute(for: host))
+            }
+        }
+    }
+
     /// Reads VPN interface settings from UserDefaults.
     private var allowedInterfacePrefixes: [String] {
         var prefixes = [String]()
@@ -40,14 +50,6 @@ final class RouteChecker: Sendable {
 
         if !prefixes.contains(defaultPrefix) {
             prefixes.append(defaultPrefix)
-        }
-
-        // Common VPN interfaces: WireGuard, Tunnelblick, ProtonVPN, Mullvad
-        let knownVPNPrefixes = ["utun", "ppp", "tap", "tun"]
-        for known in knownVPNPrefixes where !prefixes.contains(where: { known.hasPrefix($0) || $0.hasPrefix(known) }) {
-            if known == "utun" && !prefixes.contains(defaultPrefix) {
-                continue
-            }
         }
 
         return prefixes

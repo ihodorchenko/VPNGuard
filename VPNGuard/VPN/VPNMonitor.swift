@@ -53,7 +53,7 @@ final class VPNMonitor {
         var allViaVPN = true
 
         for host in hosts {
-            let viaVPN = RouteChecker.shared.isVPNRoute(for: host)
+            let viaVPN = await RouteChecker.shared.isVPNRouteAsync(for: host)
             if !viaVPN {
                 allViaVPN = false
                 break
