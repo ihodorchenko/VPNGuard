@@ -6,16 +6,41 @@
 //
 
 import AppKit
+import SwiftUI
 
+@main
 final class AppDelegate: NSObject, NSApplicationDelegate {
+
+    static func main() {
+        let application = NSApplication.shared
+        let delegate = AppDelegate()
+        application.delegate = delegate
+        application.setActivationPolicy(.accessory)
+
+        // `NSApplication.delegate` is weak; keep the delegate alive for the
+        // entire run loop.
+        withExtendedLifetime(delegate) {
+            application.run()
+        }
+    }
 
     private var statusBarController: StatusBarController!
     private var vpnMonitor: VPNMonitor!
     private var protectionEngine: ProtectionEngine!
 
-    func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.setActivationPolicy(.accessory)
+    /// macOS 26+ hosts the Settings scene itself so it can be opened
+    /// programmatically through the SwiftUI `openSettings` action.
+    private var settingsScene: AnyObject?
 
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        guard #available(macOS 26.0, *) else { return }
+
+        let host = SettingsSceneHost()
+        NSApplication.shared.addSceneRepresentation(host.representation)
+        settingsScene = host
+    }
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
         Logger.shared.info("VPNGuard starting")
 
         protectionEngine = ProtectionEngine()
@@ -134,5 +159,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         vpnMonitor.start()
 
         Logger.shared.info("VPNGuard ready")
+    }
+
+    // MARK: - Settings
+
+    /// Opens the SwiftUI Settings window. macOS 26+ uses the SwiftUI
+    /// `openSettings` action (the action behind `SettingsLink`); older systems
+    /// use a plain AppKit window hosting the same view.
+    func showSettings() {
+        if #available(macOS 26.0, *), let host = settingsScene as? SettingsSceneHost {
+            host.open()
+        } else {
+            SettingsWindowController.shared.show()
+        }
+        NSApp.activate(ignoringOtherApps: true)
+    }
+}
+
+/// Hosts the SwiftUI Settings scene for apps that present their menu with
+/// AppKit. `openSettings` is the action behind `SettingsLink`.
+@available(macOS 26.0, *)
+@MainActor
+private final class SettingsSceneHost {
+
+    let representation = NSHostingSceneRepresentation {
+        Settings {
+            SettingsView()
+        }
+    }
+
+    func open() {
+        representation.environment.openSettings()
     }
 }

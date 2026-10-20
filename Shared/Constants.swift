@@ -49,6 +49,10 @@ nonisolated enum Constants {
 
     static let defaultVPNInterfacePrefix = "utun"
 
+    /// Maximum number of protected hosts. Every polling cycle checks each host,
+    /// so the cap keeps route checks and DNS refreshes bounded.
+    static let maxProtectedHosts = 32
+
     /// Interval between VPN route checks (seconds).
     static let vpnCheckInterval: TimeInterval = 2.0
 

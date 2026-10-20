@@ -113,8 +113,7 @@ final class StatusBarController: NSObject, MenuActions {
     }
 
     @objc func openSettings() {
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-        NSApp.activate(ignoringOtherApps: true)
+        (NSApp.delegate as? AppDelegate)?.showSettings()
     }
 
     @objc func openHelp() {

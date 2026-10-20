@@ -73,16 +73,22 @@ struct HelpView: View {
                         ok: snapshot.helperInstalled && snapshot.helperRunning,
                         detail: snapshot.helperDetail
                     )
-                    statusRow(
-                        title: "claude.ai",
-                        ok: snapshot.claudeReachable,
-                        detail: snapshot.claudeDetail
-                    )
-                    statusRow(
-                        title: "api.anthropic.com",
-                        ok: snapshot.apiReachable,
-                        detail: snapshot.apiDetail
-                    )
+
+                    if snapshot.hostChecks.isEmpty {
+                        statusRow(
+                            title: "Защищённые хосты",
+                            ok: false,
+                            detail: "Список пуст — добавьте хосты в Settings"
+                        )
+                    } else {
+                        ForEach(snapshot.hostChecks) { check in
+                            statusRow(
+                                title: check.host,
+                                ok: check.reachable,
+                                detail: check.detail
+                            )
+                        }
+                    }
 
                     Divider()
 
@@ -157,11 +163,11 @@ struct HelpView: View {
                 commandBlock(
                     title: "Правила PF установлены?",
                     command: pfRulesCheckCommand,
-                    hint: "Пустой вывод = правил нет, Claude доступен через PF."
+                    hint: "Пустой вывод = правил нет, защищённые хосты доступны через PF."
                 )
                 commandBlock(
-                    title: "Claude доступен?",
-                    command: claudeCheckCommand,
+                    title: "Защищённые хосты доступны?",
+                    command: hostsCheckCommand,
                     hint: "Timeout = блокировка активна или нет сети. HTTP 403/200 = доступ есть."
                 )
                 commandBlock(
@@ -250,11 +256,15 @@ struct HelpView: View {
         """
     }
 
-    private var claudeCheckCommand: String {
-        """
-        curl -I --connect-timeout 5 https://claude.ai
-        curl -I --connect-timeout 5 https://api.anthropic.com
-        """
+    private var hostsCheckCommand: String {
+        let hosts = Rules.shared.protectedHosts
+        guard !hosts.isEmpty else {
+            return "echo 'No protected hosts configured'"
+        }
+
+        return hosts
+            .map { "curl -I --connect-timeout 5 https://\(urlHost($0))" }
+            .joined(separator: "\n")
     }
 
     private var helperCheckCommand: String {
@@ -264,13 +274,22 @@ struct HelpView: View {
     }
 
     private var manualRemovalCommand: String {
-        """
-        sudo pfctl -a \(Constants.pfAnchorName) -F all
-        echo '# VPNGuard disabled' | sudo tee \(Constants.pfConfigPath)
-        sudo pfctl -a \(Constants.pfAnchorName) -f \(Constants.pfConfigPath)
-        sudo pfctl -a \(Constants.pfAnchorName) -s rules
-        curl -I --connect-timeout 5 https://claude.ai
-        """
+        var lines = [
+            "sudo pfctl -a \(Constants.pfAnchorName) -F all",
+            "echo '# VPNGuard disabled' | sudo tee \(Constants.pfConfigPath)",
+            "sudo pfctl -a \(Constants.pfAnchorName) -f \(Constants.pfConfigPath)",
+            "sudo pfctl -a \(Constants.pfAnchorName) -s rules"
+        ]
+
+        if let firstHost = Rules.shared.protectedHosts.first {
+            lines.append("curl -I --connect-timeout 5 https://\(urlHost(firstHost))")
+        }
+
+        return lines.joined(separator: "\n")
+    }
+
+    private func urlHost(_ host: String) -> String {
+        host.contains(":") && !host.hasPrefix("[") ? "[\(host)]" : host
     }
 
     // MARK: - Actions
@@ -290,7 +309,8 @@ struct HelpView: View {
             vpnState: vpnLabel,
             protectionEnabled: engine.protectionEnabled,
             appBlocking: engine.isBlocking,
-            helperInstalled: PFManager.shared.helperInstalled
+            helperInstalled: PFManager.shared.helperInstalled,
+            hosts: Rules.shared.protectedHosts
         )
     }
 

@@ -7,6 +7,14 @@
 
 import Foundation
 
+struct HostDiagnostic: Sendable, Identifiable, Equatable {
+    let host: String
+    let reachable: Bool
+    let detail: String
+
+    var id: String { host }
+}
+
 struct DiagnosticsSnapshot: Sendable {
     let vpnState: String
     let protectionEnabled: Bool
@@ -15,10 +23,7 @@ struct DiagnosticsSnapshot: Sendable {
     let pfConfigPreview: String
     let pfRulesOutput: String
     let pfRulesReadable: Bool
-    let claudeReachable: Bool
-    let claudeDetail: String
-    let apiReachable: Bool
-    let apiDetail: String
+    let hostChecks: [HostDiagnostic]
     let helperRunning: Bool
     let helperDetail: String
     let checkedAt: Date
@@ -30,15 +35,13 @@ nonisolated enum DiagnosticsService {
         vpnState: String,
         protectionEnabled: Bool,
         appBlocking: Bool,
-        helperInstalled: Bool
+        helperInstalled: Bool,
+        hosts: [String]
     ) async -> DiagnosticsSnapshot {
-        async let claude = checkHTTP(url: URL(string: "https://claude.ai")!)
-        async let api = checkHTTP(url: URL(string: "https://api.anthropic.com")!)
         async let pfRules = readPFRules()
         async let helper = checkHelperProcess()
 
-        let claudeResult = await claude
-        let apiResult = await api
+        let hostChecks = await checkHosts(hosts)
         let pfResult = await pfRules
         let helperResult = await helper
 
@@ -50,10 +53,7 @@ nonisolated enum DiagnosticsService {
             pfConfigPreview: readPFConfigPreview(),
             pfRulesOutput: pfResult.output,
             pfRulesReadable: pfResult.readable,
-            claudeReachable: claudeResult.reachable,
-            claudeDetail: claudeResult.detail,
-            apiReachable: apiResult.reachable,
-            apiDetail: apiResult.detail,
+            hostChecks: hostChecks,
             helperRunning: helperResult.running,
             helperDetail: helperResult.detail,
             checkedAt: Date()
@@ -62,7 +62,36 @@ nonisolated enum DiagnosticsService {
 
     // MARK: - HTTP
 
-    private static func checkHTTP(url: URL) async -> (reachable: Bool, detail: String) {
+    private static func checkHosts(_ hosts: [String]) async -> [HostDiagnostic] {
+        await withTaskGroup(
+            of: (String, HostDiagnostic).self,
+            returning: [HostDiagnostic].self
+        ) { group in
+            for host in hosts {
+                group.addTask {
+                    (host, await checkHTTP(host: host))
+                }
+            }
+
+            var byHost: [String: HostDiagnostic] = [:]
+            for await (host, diagnostic) in group {
+                byHost[host] = diagnostic
+            }
+
+            // Preserve the order configured by the user.
+            return hosts.compactMap { byHost[$0] }
+        }
+    }
+
+    private static func checkHTTP(host: String) async -> HostDiagnostic {
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = host
+
+        guard let url = components.url else {
+            return HostDiagnostic(host: host, reachable: false, detail: "Invalid host")
+        }
+
         var request = URLRequest(url: url)
         request.httpMethod = "HEAD"
         request.timeoutInterval = 5
@@ -72,13 +101,17 @@ nonisolated enum DiagnosticsService {
             let (_, response) = try await URLSession.shared.data(for: request)
             if let http = response as? HTTPURLResponse {
                 // Any HTTP response means the connection reached the server.
-                return (true, "HTTP \(http.statusCode)")
+                return HostDiagnostic(host: host, reachable: true, detail: "HTTP \(http.statusCode)")
             }
-            return (true, "Response received")
+            return HostDiagnostic(host: host, reachable: true, detail: "Response received")
         } catch let error as URLError where error.code == .timedOut {
-            return (false, "Timeout — connection blocked or network unavailable")
+            return HostDiagnostic(
+                host: host,
+                reachable: false,
+                detail: "Timeout — connection blocked or network unavailable"
+            )
         } catch {
-            return (false, error.localizedDescription)
+            return HostDiagnostic(host: host, reachable: false, detail: error.localizedDescription)
         }
     }
 

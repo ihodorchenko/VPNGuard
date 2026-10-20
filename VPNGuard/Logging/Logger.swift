@@ -18,7 +18,7 @@ enum LogLevel: String, Sendable {
 }
 
 /// Thread-safe file logger with structured multi-line output and size limits.
-final class Logger: @unchecked Sendable {
+nonisolated final class Logger: @unchecked Sendable {
 
     static let shared = Logger()
 
@@ -64,6 +64,7 @@ final class Logger: @unchecked Sendable {
     }
 
     /// Opens the log directory in Finder.
+    @MainActor
     func revealLogsInFinder() {
         NSWorkspace.shared.open(Constants.logsDirectory)
     }

@@ -20,6 +20,15 @@ struct SettingsView: View {
 
     @State private var hostsText: String = ""
     @State private var saveMessage: String?
+    @State private var isSaving = false
+
+    private var parsedHosts: ProtectionHostParseResult {
+        ProtectionHostParser.parse(hostsText.components(separatedBy: .newlines))
+    }
+
+    private var appVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
+    }
 
     var body: some View {
         Form {
@@ -34,16 +43,42 @@ struct SettingsView: View {
             Section("Protected Hosts") {
                 TextEditor(text: $hostsText)
                     .font(.system(.body, design: .monospaced))
-                    .frame(minHeight: 80)
-                    .onAppear { loadHosts() }
-
-                HStack {
-                    Button("Save Hosts") { saveHosts() }
-                    if let saveMessage {
-                        Text(saveMessage)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                    .frame(minHeight: 100)
+                    .onChange(of: hostsText) { _, _ in
+                        saveMessage = nil
                     }
+
+                HStack(spacing: 12) {
+                    Button(isSaving ? "Saving…" : "Save Hosts") {
+                        saveHosts()
+                    }
+                    .disabled(isSaving || parsedHosts.hosts.isEmpty)
+
+                    Button("Reset to Defaults") {
+                        hostsText = Constants.defaultProtectedHosts.joined(separator: "\n")
+                    }
+                    .disabled(isSaving)
+
+                    if isSaving {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                }
+
+                Text("One host per line. Schemes, paths and ports are ignored; up to \(Constants.maxProtectedHosts) hosts.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                if !parsedHosts.invalid.isEmpty {
+                    Text("Ignored entries: \(parsedHosts.invalid.joined(separator: ", "))")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+
+                if let saveMessage {
+                    Text(saveMessage)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
 
@@ -52,7 +87,7 @@ struct SettingsView: View {
             }
 
             Section("About") {
-                LabeledContent("Version", value: "1.0.0")
+                LabeledContent("Version", value: appVersion)
                 LabeledContent("Bundle ID", value: Constants.appBundleID)
                 Text("VPNGuard blocks access to protected hosts when VPN is unavailable using macOS PF firewall.")
                     .font(.caption)
@@ -60,31 +95,34 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 420, height: 420)
-        .padding()
-    }
-
-    private func loadHosts() {
-        if let saved = UserDefaults.standard.stringArray(
-            forKey: Constants.DefaultsKey.protectedHosts
-        ), !saved.isEmpty {
-            hostsText = saved.joined(separator: "\n")
-        } else {
-            hostsText = Constants.defaultProtectedHosts.joined(separator: "\n")
+        .frame(width: 460, height: 560)
+        .onAppear {
+            loadHosts()
         }
     }
 
+    private func loadHosts() {
+        hostsText = Rules.shared.protectedHosts.joined(separator: "\n")
+    }
+
     private func saveHosts() {
-        let hosts = hostsText
-            .components(separatedBy: .newlines)
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
+        let result = parsedHosts
+        guard !result.hosts.isEmpty else {
+            saveMessage = "Add at least one valid host"
+            return
+        }
+
+        isSaving = true
+        saveMessage = nil
 
         Task { @MainActor in
-            Rules.shared.updateHosts(hosts)
-            saveMessage = "Saved \(hosts.count) host(s)"
+            let ips = await Rules.shared.updateHosts(result.hosts)
+            hostsText = result.hosts.joined(separator: "\n")
+            isSaving = false
+            saveMessage = "Saved \(result.hosts.count) host(s). Active IP set: \(ips.count)."
             Logger.shared.info("Protected hosts updated", details: [
-                "Hosts": hosts.joined(separator: ", ")
+                "Hosts": result.hosts.joined(separator: ", "),
+                "IPCount": "\(ips.count)"
             ])
         }
     }

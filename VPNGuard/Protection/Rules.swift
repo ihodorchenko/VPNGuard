@@ -20,12 +20,22 @@ final class Rules: ObservableObject {
     private var refreshTimer: Timer?
 
     private init() {
-        if let saved = UserDefaults.standard.stringArray(
+        let saved = UserDefaults.standard.stringArray(
             forKey: Constants.DefaultsKey.protectedHosts
-        ), !saved.isEmpty {
-            protectedHosts = saved
-        } else {
+        ) ?? []
+        let parsed = ProtectionHostParser.parse(saved)
+
+        if parsed.hosts.isEmpty {
             protectedHosts = Constants.defaultProtectedHosts
+        } else {
+            protectedHosts = parsed.hosts
+            // Migrate legacy values (URLs, mixed case) to the normalized form.
+            if parsed.hosts != saved {
+                UserDefaults.standard.set(
+                    parsed.hosts,
+                    forKey: Constants.DefaultsKey.protectedHosts
+                )
+            }
         }
     }
 
@@ -39,10 +49,10 @@ final class Rules: ObservableObject {
         }
     }
 
-    func updateHosts(_ hosts: [String]) {
+    func updateHosts(_ hosts: [String]) async -> Set<String> {
         protectedHosts = hosts
         UserDefaults.standard.set(hosts, forKey: Constants.DefaultsKey.protectedHosts)
-        Task { await refresh() }
+        return await refresh()
     }
 
     // MARK: - DNS Refresh
@@ -68,14 +78,25 @@ final class Rules: ObservableObject {
     @discardableResult
     func refresh() async -> Set<String> {
         var resolved = Set<String>()
+        let hosts = protectedHosts
 
-        for host in protectedHosts {
-            let ips = await DNSResolver.shared.resolve(host: host)
-            resolved.formUnion(ips)
-            Logger.shared.debug("Resolved host", details: [
-                "Host": host,
-                "IPs": ips.joined(separator: ", ")
-            ])
+        // Resolve hosts concurrently: with several protected hosts, sequential
+        // lookups would multiply the DNS timeout by the host count.
+        await withTaskGroup(of: [String].self) { group in
+            for host in hosts {
+                group.addTask {
+                    let ips = await DNSResolver.shared.resolve(host: host)
+                    Logger.shared.debug("Resolved host", details: [
+                        "Host": host,
+                        "IPs": ips.joined(separator: ", ")
+                    ])
+                    return ips
+                }
+            }
+
+            for await ips in group {
+                resolved.formUnion(ips)
+            }
         }
 
         let decision = ProtectedIPPolicy.decide(

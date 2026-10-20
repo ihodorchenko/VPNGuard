@@ -52,15 +52,22 @@ final class VPNMonitor {
         defer { isChecking = false }
 
         let hosts = Rules.shared.protectedHosts
-        var checks: [Bool] = []
-        checks.reserveCapacity(hosts.count)
 
-        for host in hosts {
-            let viaVPN = await RouteChecker.shared.isVPNRouteAsync(for: host)
-            checks.append(viaVPN)
-            if !viaVPN {
-                break
+        // Check hosts concurrently: a stalled `route` call must not delay the
+        // remaining hosts by the full command timeout each.
+        let checks = await withTaskGroup(of: Bool.self, returning: [Bool].self) { group in
+            for host in hosts {
+                group.addTask {
+                    await RouteChecker.shared.isVPNRouteAsync(for: host)
+                }
             }
+
+            var results: [Bool] = []
+            results.reserveCapacity(hosts.count)
+            for await result in group {
+                results.append(result)
+            }
+            return results
         }
 
         // Engine is edge-triggered: repeated same-status calls are no-ops.
