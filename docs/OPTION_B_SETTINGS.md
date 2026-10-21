@@ -82,6 +82,10 @@ struct ProtectionHostParseResult {
   - URL превращаются в хосты;
   - регистр нормализуется;
   - дубликаты удаляются.
+- Одноразовая миграция встроенного списка: если сохранён ровно старый дефолт
+  (`claude.ai`, `api.anthropic.com`), он заменяется актуальным
+  (`chatgpt.com`, `api.openai.com`, `auth.openai.com`). Версия миграции
+  хранится в `defaultsMigrationVersion`; пользовательские списки не меняются.
 - `updateHosts(_:)`:
   - сохраняет список;
   - дожидается DNS-refresh;

@@ -10,6 +10,7 @@ DerivedData/
 .derivedData/
 *.app
 *.ipa
+*.xcresult
 *.dSYM.zip
 *.dSYM
 

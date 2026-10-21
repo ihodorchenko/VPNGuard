@@ -49,6 +49,7 @@ VPNGuard/                    # Repository root
 ├── Tests/                   # Standalone SwiftPM unit tests
 ├── docs/                    # Design notes (e.g. OPTION_B_SETTINGS.md)
 ├── scripts/                 # Maintenance scripts
+├── LICENSE                  # MIT License
 ├── README.md
 └── Package.swift            # SwiftPM test harness
 ```
@@ -222,4 +223,4 @@ Anchor: `com.apple/vpnguard` (uses the system `com.apple/*` namespace — no /et
 
 ## License
 
-Private project — all rights reserved.
+Released under the [MIT License](LICENSE).
