@@ -20,22 +20,42 @@ final class Rules: ObservableObject {
     private var refreshTimer: Timer?
 
     private init() {
-        let saved = UserDefaults.standard.stringArray(
+        let defaults = UserDefaults.standard
+        let saved = defaults.stringArray(
             forKey: Constants.DefaultsKey.protectedHosts
         ) ?? []
         let parsed = ProtectionHostParser.parse(saved)
+        let migrationVersion = defaults.integer(
+            forKey: Constants.DefaultsKey.defaultsMigrationVersion
+        )
 
         if parsed.hosts.isEmpty {
             protectedHosts = Constants.defaultProtectedHosts
+        } else if migrationVersion < Constants.currentDefaultsVersion,
+                  parsed.hosts == Constants.legacyDefaultProtectedHosts {
+            // The user never customized the list — it is just the old built-in
+            // default. Adopt the new defaults (OpenAI hosts included).
+            protectedHosts = Constants.defaultProtectedHosts
+            defaults.set(
+                protectedHosts,
+                forKey: Constants.DefaultsKey.protectedHosts
+            )
         } else {
             protectedHosts = parsed.hosts
             // Migrate legacy values (URLs, mixed case) to the normalized form.
             if parsed.hosts != saved {
-                UserDefaults.standard.set(
+                defaults.set(
                     parsed.hosts,
                     forKey: Constants.DefaultsKey.protectedHosts
                 )
             }
+        }
+
+        if migrationVersion < Constants.currentDefaultsVersion {
+            defaults.set(
+                Constants.currentDefaultsVersion,
+                forKey: Constants.DefaultsKey.defaultsMigrationVersion
+            )
         }
     }
 

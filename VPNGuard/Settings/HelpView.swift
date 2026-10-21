@@ -191,7 +191,7 @@ struct HelpView: View {
                 commandBlock(
                     title: "Очистить PF и отключить блокировку",
                     command: manualRemovalCommand,
-                    hint: "Выполняйте по порядку. После этого curl к claude.ai должен отвечать."
+                    hint: "Выполняйте по порядку. После этого curl к claude.ai или chatgpt.com должен отвечать."
                 )
             }
         }

@@ -5,6 +5,9 @@ Native macOS Kill Switch that **blocks network access at the system level** to p
 Protected by default:
 - `claude.ai`
 - `api.anthropic.com`
+- `chatgpt.com`
+- `api.openai.com`
+- `auth.openai.com`
 
 ## How It Works
 
@@ -88,7 +91,7 @@ Menu actions:
 |---------|---------|-------------|
 | VPN interface prefix | `utun` | Route interface prefix for VPN detection |
 | Custom interface | — | Exact interface name (e.g. `utun3`) |
-| Protected hosts | claude.ai, api.anthropic.com | One host per line; schemes, paths and ports are ignored; up to 32 hosts |
+| Protected hosts | claude.ai, api.anthropic.com, chatgpt.com, api.openai.com, auth.openai.com | One host per line; schemes, paths and ports are ignored; up to 32 hosts |
 | Auto start | true | Enable protection on launch |
 
 Hosts can be changed at any time without rebuilding: **Settings… → Protected Hosts → Save Hosts**. Schemes (`https://`), paths, ports, comments and duplicates are normalized automatically, and the Help panel checks the same list.

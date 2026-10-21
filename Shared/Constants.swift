@@ -36,6 +36,8 @@ nonisolated enum Constants {
         static let vpnInterfacePrefix = "vpnInterfacePrefix"
         static let customVPNInterface = "customVPNInterface"
         static let protectedHosts = "protectedHosts"
+        /// Version of the built-in host list last applied to this install.
+        static let defaultsMigrationVersion = "defaultsMigrationVersion"
         static let autoStart = "autoStart"
         static let protectionEnabled = "protectionEnabled"
     }
@@ -44,8 +46,22 @@ nonisolated enum Constants {
 
     static let defaultProtectedHosts = [
         "claude.ai",
+        "api.anthropic.com",
+        "chatgpt.com",
+        "api.openai.com",
+        "auth.openai.com"
+    ]
+
+    /// Built-in list from before the OpenAI hosts were added. Used once to
+    /// upgrade installs that saved the old defaults verbatim.
+    static let legacyDefaultProtectedHosts = [
+        "claude.ai",
         "api.anthropic.com"
     ]
+
+    /// Bump when `defaultProtectedHosts` changes so saved old defaults are
+    /// migrated, while user-customized lists are left untouched.
+    static let currentDefaultsVersion = 2
 
     static let defaultVPNInterfacePrefix = "utun"
 

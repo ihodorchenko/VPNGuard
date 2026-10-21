@@ -26,7 +26,13 @@ final class IPCTests: XCTestCase {
     func testDefaultProtectedHosts() {
         XCTAssertEqual(
             Constants.defaultProtectedHosts,
-            ["claude.ai", "api.anthropic.com"]
+            [
+                "claude.ai",
+                "api.anthropic.com",
+                "chatgpt.com",
+                "api.openai.com",
+                "auth.openai.com"
+            ]
         )
     }
 }
